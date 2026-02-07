@@ -1,7 +1,7 @@
 #!/bin/bash
 
-export GITHUB_REPOSITORY_URL="${GITHUB_REPOSITORY_URL"
+export GIT_REPOSITORY__URL="$GIT_REPOSITORY__URL"
 
-git clone "${GITHUB_REPOSITORY_URL}" /home/app/output
+git clone "$GIT_REPOSITORY__URL" /home/app/output
 
-exec script.js
+exec node script.js

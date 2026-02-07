@@ -10,5 +10,16 @@ RUN apt-get install git -y
 
 # Entry point
 WORKDIR /home/app
+
+
 COPY main.sh main.sh
-ENTRYPOINT [ "home/app/main.sh" ] #when container is up this file is executed
+COPY script.js script.js
+COPY package*.json .
+
+RUN npm install
+
+RUN chmod +x main.sh
+RUN chmod +x script.js
+
+
+ENTRYPOINT [ "/home/app/main.sh" ] 
