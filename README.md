@@ -6,10 +6,8 @@ Deploy any GitHub repository by pasting its URL.
 The system spins up an isolated ECS task, builds the project, uploads static assets to S3, and serves them via a subdomain-based reverse proxy — all with **live logs**.
 
 ---
-
 ## 🎬 Demo
 
-📹 **Demo Video:**  
 https://github.com/user-attachments/assets/c4c05fcf-dd54-4089-b479-2c1d60f29374
 
 ---
