@@ -1,113 +1,102 @@
-# ⚡ ECS Preview Deployment Service
+# ECS Preview Deployment Service
 
-> A lightweight **Vercel-like preview deployment platform** built on **AWS ECS + S3**, with real-time build logs streamed to the browser.
+A lightweight, Vercel-style preview deployment platform built on AWS ECS and S3, with real-time build logs streamed to the browser.
 
-Deploy any GitHub repository by pasting its URL.  
-The system spins up an isolated ECS task, builds the project, uploads static assets to S3, and serves them via a subdomain-based reverse proxy — all with **live logs**.
+Paste a GitHub repository URL and the system spins up an isolated ECS Fargate task, builds the project, uploads the static output to S3, and serves it through a subdomain-based reverse proxy — with live build logs the whole way through.
 
----
-## 🎬 Demo
+## Demo
 
 https://github.com/user-attachments/assets/c4c05fcf-dd54-4089-b479-2c1d60f29374
 
----
+## Architecture
 
-## 🚀 What is this?
+```
+Frontend (Next.js)
+      │  POST /project { gitURL }
+      ▼
+API Server (Express, :9000)
+      │  ECS RunTaskCommand
+      ▼
+ECS Fargate Task (build-server image)
+      │  clone → install → build
+      ├──────────────► Redis (logs:{PROJECT_ID}) ──► Socket Server (:8080) ──► Frontend (live logs)
+      └──────────────► S3 (__outputs/{PROJECT_ID}/...)
+                              │
+                              ▼
+                    S3 Reverse Proxy (:8000)
+                              │  subdomain → S3 path
+                              ▼
+                    Browser (preview URL)
+```
 
-This project is a **preview deployment platform** similar to Vercel or Netlify, but built entirely using open infrastructure components.
+Each deployment runs in its own ephemeral container and gets a unique preview URL (`{project-slug}.localhost:8000` in local development).
 
-It:
-- Uses **AWS ECS Fargate** for ephemeral builds
-- Streams **real-time build logs** to the UI
-- Deploys static assets to **AWS S3**
-- Serves preview deployments via **subdomain-based routing**
-- Requires **zero manual server management**
+## How it works
 
-Each deployment gets its own isolated build container and unique preview URL.
+1. The user submits a GitHub repository URL from the frontend.
+2. The API server launches an ECS Fargate task from the build-server image, passing the repo URL and a generated project ID as container overrides.
+3. Inside the container, the build server clones the repo, runs `npm install && npm run build`, and streams stdout/stderr to Redis as they happen.
+4. The socket server subscribes to Redis and rebroadcasts log messages to any client subscribed to that project's ID.
+5. Once the build finishes, the container uploads the contents of `dist/` to S3 under `__outputs/{PROJECT_ID}/`.
+6. The S3 reverse proxy maps incoming subdomains to the matching S3 path, serving the deployed project.
 
----
+## Services
 
-## 🧠 High-Level Architecture
+This is a monorepo of independently deployable services — there's no shared workspace or root package manager; each directory is installed and run on its own.
 
-User → Frontend (Next.js)  
-→ API Server (Express)  
-→ AWS ECS Task (Build Container)  
-→ S3 (Static Assets)  
-→ Reverse Proxy (Subdomain Routing)  
+| Service | Description | Port |
+|---|---|---|
+| `api-server/` | Express API that triggers ECS Fargate tasks | 9000 |
+| `build-server/` | Dockerized build runner that executes inside ECS: clones, builds, and uploads to S3 | — (runs in ECS) |
+| `socket-server/` | Subscribes to Redis and streams build logs to clients over Socket.IO | 8080 |
+| `s3-reverse-proxy/` | Routes subdomains to their corresponding S3-hosted build output | 8000 |
+| `frontend-nextjs/` | UI for submitting deployments and viewing live logs | 3000 |
 
-Logs flow from ECS → Redis → WebSocket → Browser in real time.
+## Tech stack
 
----
+**Frontend** — Next.js 14, TypeScript, Tailwind CSS, shadcn/ui, Socket.IO client
 
-## 🧩 How It Works
+**Backend** — Node.js, Express, Socket.IO, Redis (pub/sub), AWS SDK v3
 
-1. User submits a GitHub repository URL
-2. API server triggers an ECS Fargate task
-3. Build container:
-   - Clones repo
-   - Runs install & build
-   - Uploads `dist/` to S3
-4. Build logs are published to Redis
-5. Socket server streams logs to the frontend
-6. Project is accessible via a preview URL
+**Infrastructure** — AWS ECS (Fargate), Docker, AWS S3
 
----
+## Getting started
 
-## 🛠 Tech Stack
+Each service is configured and run independently.
 
-### Frontend
-- Next.js 14
-- TypeScript
-- Tailwind CSS
-- shadcn/ui
-- Socket.IO
+```bash
+cd <service>
+cp .env.example .env   # fill in the required values
+npm install
+npm start              # or `npm run dev` for frontend-nextjs
+```
 
-### Backend
-- Node.js
-- Express
-- Socket.IO
-- Redis (Pub/Sub)
+Required environment variables per service:
 
-### Infrastructure
-- AWS ECS (Fargate)
-- Docker
-- AWS S3
-- AWS SDK v3
+- **api-server** — `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `CLUSTER`, `TASK`
+- **build-server** — `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY` (S3-scoped IAM credentials), `REDIS`
+- **socket-server** — `REDIS`
+- **s3-reverse-proxy** — `BASE_PATH`
 
----
+`build-server` is not meant to be run as a standalone local process — it's built into a Docker image and executed as the ECS task container.
 
-## 📁 Monorepo Structure
-
-api-server/ – Triggers ECS tasks  
-build-server/ – Dockerized build runner  
-socket-server/ – Redis → WebSocket log streaming  
-s3-reverse-proxy/ – Subdomain → S3 routing  
-frontend-nextjs/ – UI + live logs  
-
----
-
-## ✨ Features
+## Features
 
 - One-click GitHub deployments
-- Real-time build logs
-- Isolated Docker builds
-- Serverless ECS execution
-- Preview URLs per deployment
+- Real-time, per-project build logs
+- Isolated, ephemeral build containers per deployment
+- Serverless build execution via ECS Fargate
+- Unique preview URL per deployment
 
----
-
-## 🔮 Future Improvements
+## Roadmap
 
 - Custom domains
-- HTTPS with ACM
-- Auth & rate limiting
+- HTTPS via ACM
+- Authentication and rate limiting
 - Build caching
-- GitHub webhooks
-- Automatic cleanup of old previews
+- GitHub webhook triggers
+- Automatic cleanup of stale previews
 
----
+## Author
 
-## 🧑‍💻 Author
-
-Built by **Mehul**  
-Infra • Full-stack • Platform Engineering
+Built by **Mehul** — Infrastructure, full-stack, and platform engineering.
