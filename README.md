@@ -17,7 +17,7 @@ Frontend (Next.js)
 API Server (Express, :9000)
       │  ECS RunTaskCommand
       ▼
-ECS Fargate Task (build-server image)
+ECS Fargate Task (build_service image)
       │  clone → install → build
       ├──────────────► Redis (logs:{PROJECT_ID}) ──► Socket Server (:8080) ──► Frontend (live logs)
       └──────────────► S3 (__outputs/{PROJECT_ID}/...)
@@ -34,7 +34,7 @@ Each deployment runs in its own ephemeral container and gets a unique preview UR
 ## How it works
 
 1. The user submits a GitHub repository URL from the frontend.
-2. The API server launches an ECS Fargate task from the build-server image, passing the repo URL and a generated project ID as container overrides.
+2. The API server launches an ECS Fargate task from the build_service image, passing the repo URL and a generated project ID as container overrides.
 3. Inside the container, the build server clones the repo, runs `npm install && npm run build`, and streams stdout/stderr to Redis as they happen.
 4. The socket server subscribes to Redis and rebroadcasts log messages to any client subscribed to that project's ID.
 5. Once the build finishes, the container uploads the contents of `dist/` to S3 under `__outputs/{PROJECT_ID}/`.
@@ -47,7 +47,7 @@ This is a monorepo of independently deployable services — there's no shared wo
 | Service | Description | Port |
 |---|---|---|
 | `api-server/` | Express API that triggers ECS Fargate tasks | 9000 |
-| `build-server/` | Dockerized build runner that executes inside ECS: clones, builds, and uploads to S3 | — (runs in ECS) |
+| `build_service/` | Dockerized build runner that executes inside ECS: clones, builds, and uploads to S3 | — (runs in ECS) |
 | `socket-server/` | Subscribes to Redis and streams build logs to clients over Socket.IO | 8080 |
 | `s3-reverse-proxy/` | Routes subdomains to their corresponding S3-hosted build output | 8000 |
 | `frontend-nextjs/` | UI for submitting deployments and viewing live logs | 3000 |
@@ -74,11 +74,11 @@ npm start              # or `npm run dev` for frontend-nextjs
 Required environment variables per service:
 
 - **api-server** — `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `CLUSTER`, `TASK`
-- **build-server** — `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY` (S3-scoped IAM credentials), `REDIS`
+- **build_service** — `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY` (S3-scoped IAM credentials), `REDIS`
 - **socket-server** — `REDIS`
 - **s3-reverse-proxy** — `BASE_PATH`
 
-`build-server` is not meant to be run as a standalone local process — it's built into a Docker image and executed as the ECS task container.
+`build_service` is not meant to be run as a standalone local process — it's built into a Docker image and executed as the ECS task container.
 
 ## Features
 

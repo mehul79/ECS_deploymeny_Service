@@ -17,10 +17,10 @@ tooling. Each subdirectory is installed and run independently (`cd <service> && 
 
 - **api-server/** — Express server (port 9000). `POST /project` accepts `{gitURL, slug}`
   and calls `RunTaskCommand` (AWS SDK v3 `@aws-sdk/client-ecs`) to launch a Fargate task
-  from the `build-server` Docker image, injecting `GIT_REPOSITORY__URL` and `PROJECT_ID`
+  from the `build_service` Docker image, injecting `GIT_REPOSITORY__URL` and `PROJECT_ID`
   as container env overrides. Returns the preview URL immediately (`{projectSlug}.localhost:8000`)
   without waiting for the build.
-- **build-server/** — the Dockerized build runner that actually runs *inside* ECS, not
+- **build_service/** — the Dockerized build runner that actually runs *inside* ECS, not
   run directly on a dev machine. `main.sh` (the container ENTRYPOINT) clones the repo
   into `/home/app/output` then execs `script.js`, which runs `npm install && npm run build`
   on the cloned project, streams stdout/stderr to Redis (`publisher.publish("logs:{PROJECT_ID}", ...)`),
@@ -41,7 +41,7 @@ tooling. Each subdirectory is installed and run independently (`cd <service> && 
 ## Log/data flow (cross-cutting — spans multiple services, not obvious from any single file)
 
 ```
-Frontend --POST /project--> api-server --RunTaskCommand--> ECS Fargate task (build-server image)
+Frontend --POST /project--> api-server --RunTaskCommand--> ECS Fargate task (build_service image)
                                                                     |
                                                         clone -> install -> build
                                                                     |
@@ -61,7 +61,7 @@ Final asset serving is a separate path: browser -> s3-reverse-proxy (subdomain r
 
 Each service needs its own `.env` (copy from that service's `.env.example`) and its own
 `npm install`, then `node index.js` (api-server, socket-server, s3-reverse-proxy) or
-`npm run dev` (frontend-nextjs). `build-server` is not meant to be run locally as a plain
+`npm run dev` (frontend-nextjs). `build_service` is not meant to be run locally as a plain
 Node process — it expects to be the ECS container and clones into a hardcoded local path.
 
 Ports: api-server `9000`, s3-reverse-proxy `8000`, socket-server `8080`, frontend `3000` (Next.js default).
@@ -74,4 +74,4 @@ for the backend services — `npm test` in each is a stub that exits with an err
 - `api-server/index.js` hardcodes empty `subnets`/`securityGroups` arrays in the ECS
   `networkConfiguration` — these must be filled in with real AWS resource IDs to work.
 - No auth, rate limiting, HTTPS, or webhook triggers anywhere in the stack.
-- `build-server` uploads to a hardcoded bucket name (`vercel-prod-bucket`) rather than an env var.
+- `build_service` uploads to a hardcoded bucket name (`vercel-prod-bucket`) rather than an env var.
