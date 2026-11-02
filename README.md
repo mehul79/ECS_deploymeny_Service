@@ -1,4 +1,4 @@
-# ECS Preview Deployment Service
+# Launchbay
 
 A lightweight, Vercel-style preview deployment platform built on AWS ECS and S3, with real-time build logs streamed to the browser.
 
